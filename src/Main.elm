@@ -21,6 +21,11 @@ type alias Config =
 type alias Movie =
     { title : String
     , id : Int
+    , overview: String
+    , genre_ids: (List Int)
+    , poster_path: String
+    , release_date: String
+    , vote_average: Float
     }
 
 
@@ -48,9 +53,14 @@ type Msg
 
 movieDecoder : Decode.Decoder Movie
 movieDecoder =
-    Decode.map2 Movie
+    Decode.map7 Movie
         (Decode.field "title" Decode.string)
         (Decode.field "id" Decode.int)
+        (Decode.field "overview" Decode.string)
+        (Decode.field "genre_ids" (Decode.list Decode.int))
+        (Decode.field "poster_path" Decode.string)
+        (Decode.field "release_date" Decode.string)
+        (Decode.field "vote_average" Decode.float)
 
 
 getMoviesResultDecoder : Decode.Decoder GetMoviesResult
