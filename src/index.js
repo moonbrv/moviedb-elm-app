@@ -2,8 +2,14 @@ import './main.css';
 import { Elm } from './Main.elm';
 import * as serviceWorker from './serviceWorker';
 
+console.log(process.env.API_READ_ACCESS_TOKEN)
+
 Elm.Main.init({
-  node: document.getElementById('root')
+  node: document.getElementById('root'),
+  flags: {
+    accessToken: process.env.ELM_APP_API_READ_ACCESS_TOKEN,
+    baseUrl: process.env.ELM_APP_MOVIE_BASE_URL
+  }
 });
 
 // If you want your app to work offline and load faster, you can change
