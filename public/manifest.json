@@ -1,6 +1,6 @@
 {
-  "short_name": "Elm App",
-  "name": "Create Elm App Sample",
+  "short_name": "Movie - Elm App",
+  "name": "Movies Database Viewer - Elm App",
   "icons": [
     {
       "src": "favicon.ico",
