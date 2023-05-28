@@ -1,6 +1,11 @@
 module Main exposing (..)
 
 import Browser
+import Element as UI
+import Element.Background as Background
+import Element.Border as Border
+import Element.Font as Font
+import Element.Keyed as Keyed
 import Html exposing (..)
 import Html.Keyed as Keyed
 import Http
@@ -21,11 +26,11 @@ type alias Config =
 type alias Movie =
     { title : String
     , id : Int
-    , overview: String
-    , genre_ids: (List Int)
-    , poster_path: String
-    , release_date: String
-    , vote_average: Float
+    , overview : String
+    , genre_ids : List Int
+    , poster_path : String
+    , release_date : String
+    , vote_average : Float
     }
 
 
@@ -139,23 +144,26 @@ update msg model =
 
 ---- VIEW ----
 
-getPosterUrl: String -> String
+
+getPosterUrl : String -> String
 getPosterUrl path =
     "https://image.tmdb.org/t/p/w300" ++ path
 
 
 view : Model -> Html Msg
 view model =
-    case model.config.error of
-        Nothing ->
-            if List.isEmpty model.movies then
-                div [] [ text "loading..." ]
+    UI.layout []
+        (case model.config.error of
+            Nothing ->
+                if List.isEmpty model.movies then
+                    UI.el [] (UI.text "loading...")
 
-            else
-                Keyed.node "div" [] (List.map (\movie -> ( String.fromInt movie.id, div [] [ text movie.title ] )) model.movies)
+                else
+                    Keyed.column [] (List.map (\movie -> ( String.fromInt movie.id, UI.el [] (UI.text movie.title) )) model.movies)
 
-        Just errorMessage ->
-            div [] [ text errorMessage ]
+            Just errorMessage ->
+                UI.el [] (UI.text errorMessage)
+        )
 
 
 
