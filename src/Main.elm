@@ -139,6 +139,10 @@ update msg model =
 
 ---- VIEW ----
 
+getPosterUrl: String -> String
+getPosterUrl path =
+    "https://image.tmdb.org/t/p/w300" ++ path
+
 
 view : Model -> Html Msg
 view model =
