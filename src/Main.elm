@@ -8,11 +8,15 @@ import Json.Decode as Decode
 
 ---- MODEL ----
 
-
-type alias Model =
+type alias Config =
     { accessToken: String
     , baseUrl: String
     , error: Maybe String
+    }
+
+type alias Model =
+    { config: Config
+    , movies: (List String)
     }
 
 type alias Flags =
@@ -34,12 +38,12 @@ init : Decode.Value -> ( Model, Cmd Msg )
 init flags =
     case Decode.decodeValue flagsDecoder flags of
         Ok decodedFlags ->
-            ( Model decodedFlags.accessToken decodedFlags.baseUrl Nothing
+            ( Model (Config decodedFlags.accessToken decodedFlags.baseUrl Nothing) []
             , Cmd.none
             )
 
         Err error ->
-            ( Model "" "" (handleJsonError error)
+            ( Model (Config "" "" (handleJsonError error)) []
             , Cmd.none
             )
 
@@ -63,12 +67,12 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    case model.error of
+    case model.config.error of
         Nothing  ->
             div []
                 [ img [ src "/logo.svg" ] []
                 , h1 [] [ text "Your Elm App is working!" ]
-                , div [] [ text model.baseUrl ]
+                , div [] [ text model.config.baseUrl ]
                 ]
         Just errorMessage ->
             div [] [ text errorMessage ]

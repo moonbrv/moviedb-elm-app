@@ -2,8 +2,6 @@ import './main.css';
 import { Elm } from './Main.elm';
 import * as serviceWorker from './serviceWorker';
 
-console.log(process.env.API_READ_ACCESS_TOKEN)
-
 Elm.Main.init({
   node: document.getElementById('root'),
   flags: {
