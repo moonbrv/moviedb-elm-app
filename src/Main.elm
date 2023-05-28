@@ -1,10 +1,11 @@
 module Main exposing (..)
 
 import Browser
-import Element as UI
+import Element as E
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
+import Element.Input as Input
 import Element.Keyed as Keyed
 import Html exposing (..)
 import Html.Keyed as Keyed
@@ -145,24 +146,97 @@ update msg model =
 ---- VIEW ----
 
 
+color =
+    { blue = E.rgb255 0x72 0x9F 0xCF
+    , white = E.rgb255 255 255 255
+    }
+
+
 getPosterUrl : String -> String
 getPosterUrl path =
     "https://image.tmdb.org/t/p/w300" ++ path
 
 
+getMovieTitle : Movie -> String
+getMovieTitle movie =
+    let
+        year =
+            String.split "-" movie.release_date |> List.head
+    in
+    case year of
+        Just y ->
+            movie.title ++ " (" ++ y ++ ")"
+
+        Nothing ->
+            movie.title
+
+
+viewMovieCard : Movie -> E.Element msg
+viewMovieCard movie =
+    let
+        color1 =
+            E.rgba255 17 17 26 0.05
+
+        color2 =
+            E.rgba255 17 17 26 0.1
+
+        shadow1 =
+            Border.shadow
+                { offset = ( 0, 1 )
+                , size = 0
+                , blur = 0
+                , color = color1
+                }
+
+        shadow2 =
+            Border.shadow
+                { offset = ( 0, 0 )
+                , size = 0
+                , blur = 8
+                , color = color2
+                }
+    in
+    E.el [ shadow1, shadow2, Border.rounded 8, E.width E.fill ]
+        (E.row []
+            [ E.image
+                [ Border.roundEach
+                    { topLeft = 8
+                    , topRight = 0
+                    , bottomLeft = 8
+                    , bottomRight = 0
+                    }
+                ]
+                { src = getPosterUrl movie.poster_path
+                , description = movie.title
+                }
+            , E.column [ E.width E.fill, E.height E.fill, E.padding 12 ]
+                [ E.textColumn [ E.alignTop, E.spacing 12 ]
+                    [ E.paragraph [] [ E.el [ Font.semiBold ] (E.text (getMovieTitle movie)) ]
+                    , E.paragraph [] [ E.text movie.overview ]
+                    ]
+                , Input.button [ E.paddingXY 12 8, E.alignRight, E.alignBottom, Font.color color.white, Background.color color.blue, Border.rounded 4 ]
+                    { label = E.text "Details"
+                    , onPress = Nothing
+                    }
+                ]
+            ]
+        )
+
+
 view : Model -> Html Msg
 view model =
-    UI.layout []
+    E.layout []
         (case model.config.error of
             Nothing ->
                 if List.isEmpty model.movies then
-                    UI.el [] (UI.text "loading...")
+                    E.el [] (E.text "loading...")
 
                 else
-                    Keyed.column [] (List.map (\movie -> ( String.fromInt movie.id, UI.el [] (UI.text movie.title) )) model.movies)
+                    Keyed.column [ E.spacing 24, E.padding 24 ]
+                        (List.map (\movie -> ( String.fromInt movie.id, viewMovieCard movie )) model.movies)
 
             Just errorMessage ->
-                UI.el [] (UI.text errorMessage)
+                E.el [] (E.text errorMessage)
         )
 
 
