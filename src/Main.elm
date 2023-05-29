@@ -74,6 +74,7 @@ type MoviesState
     = Loading
     | Idle
     | Error String
+    | Broken String
 
 
 movieDecoder : Decode.Decoder Movie
@@ -131,7 +132,7 @@ init flags =
                         Nothing ->
                             "Error during parsing flags (configuration)"
             in
-            ( initialModel (Config "" "") <| Error errorMessage
+            ( initialModel (Config "" "") <| Broken errorMessage
             , Cmd.none
             )
 
@@ -169,7 +170,9 @@ update msg model =
                     )
 
                 Err _ ->
-                    ( model, Cmd.none )
+                    ( { model | state = Error "Error during getting movies" }
+                    , Cmd.none
+                    )
 
 
 
@@ -179,6 +182,7 @@ update msg model =
 color =
     { blue = E.rgb255 0x72 0x9F 0xCF
     , white = E.rgb255 255 255 255
+    , red = E.rgb255 0xAA 0x00 0x00
     }
 
 
@@ -254,7 +258,16 @@ view model =
                     (List.map (\movie -> ( String.fromInt movie.id, viewMovieCard movie )) model.movies)
 
             Error errorMessage ->
-                E.el [] (E.text errorMessage)
+                E.column [ E.centerX, E.centerY ]
+                    [ E.el [ Font.color color.red, E.padding 12 ] (E.text errorMessage)
+                    , Input.button [ E.paddingXY 12 8, E.centerX, E.centerY, Font.color color.white, Background.color color.blue, Border.rounded 4 ]
+                        { label = E.text "Retry"
+                        , onPress = Just GetPopularMovies
+                        }
+                    ]
+
+            Broken errorMessage ->
+                E.el [ Font.color color.red, E.centerX, E.centerY ] (E.text errorMessage)
         )
 
 
