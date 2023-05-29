@@ -20,7 +20,6 @@ import Json.Decode as Decode
 type alias Config =
     { accessToken : String
     , baseUrl : String
-    , error : Maybe String
     }
 
 
@@ -35,9 +34,24 @@ type alias Movie =
     }
 
 
+initialModel : Config -> MoviesState -> Model
+initialModel config state =
+    { movies = []
+    , state = state
+    , page = 1
+    , totalPages = 1
+    , totalResults = 0
+    , config = config
+    }
+
+
 type alias Model =
     { config : Config
     , movies : List Movie
+    , state : MoviesState
+    , page : Int
+    , totalPages : Int
+    , totalResults : Int
     }
 
 
@@ -54,7 +68,12 @@ type alias GetMoviesResult =
 type Msg
     = GetPopularMovies
     | GotPopularMovies (Result Http.Error GetMoviesResult)
-    | ErrorGettingMovies
+
+
+type MoviesState
+    = Loading
+    | Idle
+    | Error String
 
 
 movieDecoder : Decode.Decoder Movie
@@ -93,14 +112,26 @@ init flags =
         Ok decodedFlags ->
             let
                 config =
-                    Config decodedFlags.accessToken decodedFlags.baseUrl Nothing
+                    Config decodedFlags.accessToken decodedFlags.baseUrl
+
+                model =
+                    initialModel config Loading
             in
-            ( Model config []
-            , getPopularMovies config
+            ( model
+            , getPopularMovies model
             )
 
         Err error ->
-            ( Model (Config "" "" (handleJsonError error)) []
+            let
+                errorMessage =
+                    case handleJsonError error of
+                        Just errMessage ->
+                            errMessage
+
+                        Nothing ->
+                            "Error during parsing flags (configuration)"
+            in
+            ( initialModel (Config "" "") <| Error errorMessage
             , Cmd.none
             )
 
@@ -109,14 +140,14 @@ init flags =
 ---- UPDATE ----
 
 
-getPopularMovies : Config -> Cmd Msg
-getPopularMovies config =
+getPopularMovies : Model -> Cmd Msg
+getPopularMovies model =
     Http.request
         { method = "GET"
-        , url = config.baseUrl ++ "/movie/popular"
+        , url = model.config.baseUrl ++ "/movie/popular"
         , expect = Http.expectJson GotPopularMovies getMoviesResultDecoder
         , body = Http.emptyBody
-        , headers = [ Http.header "Authorization" ("Bearer " ++ config.accessToken) ]
+        , headers = [ Http.header "Authorization" ("Bearer " ++ model.config.accessToken) ]
         , timeout = Nothing
         , tracker = Nothing
         }
@@ -126,20 +157,19 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         GetPopularMovies ->
-            ( model, getPopularMovies model.config )
+            ( { model | state = Loading }
+            , getPopularMovies model
+            )
 
         GotPopularMovies result ->
             case result of
                 Ok data ->
-                    ( { model | movies = data.results }
+                    ( { model | movies = data.results, state = Idle }
                     , Cmd.none
                     )
 
                 Err _ ->
                     ( model, Cmd.none )
-
-        _ ->
-            ( model, Cmd.none )
 
 
 
@@ -174,21 +204,10 @@ getMovieTitle movie =
 viewMovieCard : Movie -> E.Element msg
 viewMovieCard movie =
     let
-        color1 =
-            E.rgba255 17 17 26 0.05
-
         color2 =
             E.rgba255 17 17 26 0.1
 
-        shadow1 =
-            Border.shadow
-                { offset = ( 0, 1 )
-                , size = 0
-                , blur = 0
-                , color = color1
-                }
-
-        shadow2 =
+        shadow =
             Border.shadow
                 { offset = ( 0, 0 )
                 , size = 0
@@ -196,7 +215,7 @@ viewMovieCard movie =
                 , color = color2
                 }
     in
-    E.el [ shadow1, shadow2, Border.rounded 8, E.width E.fill ]
+    E.el [ shadow, Border.rounded 8, E.width E.fill ]
         (E.row []
             [ E.image
                 [ Border.roundEach
@@ -226,16 +245,15 @@ viewMovieCard movie =
 view : Model -> Html Msg
 view model =
     E.layout []
-        (case model.config.error of
-            Nothing ->
-                if List.isEmpty model.movies then
-                    E.el [] (E.text "loading...")
+        (case model.state of
+            Loading ->
+                E.el [] (E.text "loading...")
 
-                else
-                    Keyed.column [ E.spacing 24, E.padding 24 ]
-                        (List.map (\movie -> ( String.fromInt movie.id, viewMovieCard movie )) model.movies)
+            Idle ->
+                Keyed.column [ E.spacing 24, E.padding 24 ]
+                    (List.map (\movie -> ( String.fromInt movie.id, viewMovieCard movie )) model.movies)
 
-            Just errorMessage ->
+            Error errorMessage ->
                 E.el [] (E.text errorMessage)
         )
 
