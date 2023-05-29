@@ -63,7 +63,11 @@ type alias Flags =
 
 
 type alias GetMoviesResult =
-    { results : List Movie }
+    { results : List Movie
+    , page : Int
+    , total_pages : Int
+    , total_results : Int
+    }
 
 
 type Msg
@@ -92,8 +96,11 @@ movieDecoder =
 
 getMoviesResultDecoder : Decode.Decoder GetMoviesResult
 getMoviesResultDecoder =
-    Decode.map GetMoviesResult
+    Decode.map4 GetMoviesResult
         (Decode.field "results" (Decode.list movieDecoder))
+        (Decode.field "page" Decode.int)
+        (Decode.field "total_pages" Decode.int)
+        (Decode.field "total_results" Decode.int)
 
 
 flagsDecoder : Decode.Decoder Flags
@@ -166,7 +173,12 @@ update msg model =
         GotPopularMovies result ->
             case result of
                 Ok data ->
-                    ( { model | movies = data.results, state = Idle }
+                    ( { model
+                        | movies = data.results
+                        , state = Idle
+                        , totalPages = data.total_pages
+                        , totalResults = data.total_results
+                      }
                     , Cmd.none
                     )
 
