@@ -1,6 +1,6 @@
 # Elm Movie Database App
 
-App for learning Elm lang
+App for learning Elm lang. Use [The Movie DB API](https://developer.themoviedb.org/docs) as datasource.
 
 ## Requirement
 Create `.env` file in root directory with folowing data:
