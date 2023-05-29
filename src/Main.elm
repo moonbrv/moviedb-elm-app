@@ -11,6 +11,7 @@ import Html exposing (..)
 import Html.Keyed as Keyed
 import Http
 import Json.Decode as Decode
+import Svg.Loaders as Loaders
 
 
 
@@ -186,6 +187,18 @@ color =
     }
 
 
+toCssColor255 : E.Color -> String
+toCssColor255 elementColor =
+    let
+        props =
+            E.toRgb elementColor
+
+        vals =
+            List.map (\c -> String.fromInt <| round (c * 255)) [ props.red, props.green, props.blue, props.alpha ]
+    in
+    "rgba(" ++ String.join "," vals ++ ")"
+
+
 getPosterUrl : String -> String
 getPosterUrl path =
     "https://image.tmdb.org/t/p/w300" ++ path
@@ -251,7 +264,7 @@ view model =
     E.layout []
         (case model.state of
             Loading ->
-                E.el [] (E.text "loading...")
+                E.el [ E.centerX, E.centerY ] <| E.html <| Loaders.rings [ Loaders.color (toCssColor255 color.blue), Loaders.size 96 ]
 
             Idle ->
                 Keyed.column [ E.spacing 24, E.padding 24 ]
