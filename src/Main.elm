@@ -1,6 +1,7 @@
 module Main exposing (..)
 
 import Browser
+import Browser.Navigation as Nav
 import Element as E
 import Element.Background as Background
 import Element.Border as Border
@@ -12,6 +13,8 @@ import Html.Keyed as Keyed
 import Http
 import Json.Decode as Decode
 import Svg.Loaders as Loaders
+import Url
+import Url.Parser as Parser exposing ((</>))
 
 
 
@@ -22,6 +25,19 @@ type alias Config =
     { accessToken : String
     , baseUrl : String
     }
+
+
+type Msg
+    = GetPopularMovies
+    | GotPopularMovies (Result Http.Error GetMoviesResult)
+    | UrlChanged Url.Url
+    | LinkClicked Browser.UrlRequest
+
+
+type Route
+    = Home
+    | Details Int
+    | NotFound
 
 
 type alias Movie =
@@ -35,14 +51,16 @@ type alias Movie =
     }
 
 
-initialModel : Config -> MoviesState -> Model
-initialModel config state =
+initialModel : Config -> MoviesState -> Nav.Key -> Url.Url -> Model
+initialModel config state key url =
     { movies = []
     , state = state
     , page = 1
     , totalPages = 1
     , totalResults = 0
     , config = config
+    , url = url
+    , key = key
     }
 
 
@@ -53,6 +71,8 @@ type alias Model =
     , page : Int
     , totalPages : Int
     , totalResults : Int
+    , key : Nav.Key
+    , url : Url.Url
     }
 
 
@@ -68,11 +88,6 @@ type alias GetMoviesResult =
     , total_pages : Int
     , total_results : Int
     }
-
-
-type Msg
-    = GetPopularMovies
-    | GotPopularMovies (Result Http.Error GetMoviesResult)
 
 
 type MoviesState
@@ -115,8 +130,8 @@ handleJsonError error =
     Just (Decode.errorToString error)
 
 
-init : Decode.Value -> ( Model, Cmd Msg )
-init flags =
+init : Decode.Value -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init flags url key =
     case Decode.decodeValue flagsDecoder flags of
         Ok decodedFlags ->
             let
@@ -124,7 +139,7 @@ init flags =
                     Config decodedFlags.accessToken decodedFlags.baseUrl
 
                 model =
-                    initialModel config Loading
+                    initialModel config Loading key url
             in
             ( model
             , getPopularMovies model
@@ -140,9 +155,17 @@ init flags =
                         Nothing ->
                             "Error during parsing flags (configuration)"
             in
-            ( initialModel (Config "" "") <| Broken errorMessage
+            ( initialModel (Config "" "") (Broken errorMessage) key url
             , Cmd.none
             )
+
+
+routeParser : Parser.Parser (Route -> a) a
+routeParser =
+    Parser.oneOf
+        [ Parser.map Home Parser.top
+        , Parser.map Details (Parser.s "details" </> Parser.int)
+        ]
 
 
 
@@ -186,6 +209,17 @@ update msg model =
                     ( { model | state = Error "Error during getting movies" }
                     , Cmd.none
                     )
+
+        LinkClicked urlRequest ->
+            case urlRequest of
+                Browser.Internal url ->
+                    ( model, Nav.pushUrl model.key (Url.toString url) )
+
+                Browser.External url ->
+                    ( model, Nav.load url )
+
+        UrlChanged url ->
+            ( { model | url = url }, Cmd.none )
 
 
 
@@ -271,29 +305,111 @@ viewMovieCard movie =
         )
 
 
-view : Model -> Html Msg
+viewDetailsPage : Model -> Int -> E.Element Msg
+viewDetailsPage model id =
+    E.el [ E.padding 48 ] (E.text ("DETAILS PAGE " ++ String.fromInt id))
+
+
+notFoundView : String -> E.Element Msg
+notFoundView _ =
+    E.el [ Font.color color.red, Font.bold, E.padding 48 ] (E.text "Page Not Found")
+
+
+homeView : Model -> E.Element Msg
+homeView model =
+    case model.state of
+        Loading ->
+            E.el [ E.centerX, E.centerY ] <| E.html <| Loaders.rings [ Loaders.color (toCssColor255 color.blue), Loaders.size 96 ]
+
+        Idle ->
+            Keyed.column [ E.spacing 24, E.padding 24 ]
+                (List.map (\movie -> ( String.fromInt movie.id, viewMovieCard movie )) model.movies)
+
+        Error errorMessage ->
+            E.column [ E.centerX, E.centerY ]
+                [ E.el [ Font.color color.red, E.padding 12 ] (E.text errorMessage)
+                , Input.button [ E.paddingXY 12 8, E.centerX, E.centerY, Font.color color.white, Background.color color.blue, Border.rounded 4 ]
+                    { label = E.text "Retry"
+                    , onPress = Just GetPopularMovies
+                    }
+                ]
+
+        Broken errorMessage ->
+            E.el [ Font.color color.red, E.centerX, E.centerY ] (E.text errorMessage)
+
+
+routeToTitle : Route -> String
+routeToTitle route =
+    let
+        t =
+            case route of
+                NotFound ->
+                    "Page not found"
+
+                Home ->
+                    "Popular Movies"
+
+                Details id ->
+                    "Details of " ++ String.fromInt id
+    in
+    t ++ " | MovieDB"
+
+
+viewHeader : Model -> E.Element Msg
+viewHeader model =
+    E.el [ E.alignTop ] (E.text "HEADER WILL BE HERE")
+
+
+viewFooter : Model -> E.Element Msg
+viewFooter model =
+    E.el [ E.alignBottom ] (E.text "FOOTER WILL BE HERE")
+
+
+view : Model -> Browser.Document Msg
 view model =
-    E.layout []
-        (case model.state of
-            Loading ->
-                E.el [ E.centerX, E.centerY ] <| E.html <| Loaders.rings [ Loaders.color (toCssColor255 color.blue), Loaders.size 96 ]
+    let
+        maybeRoute =
+            Parser.parse routeParser model.url
+    in
+    case maybeRoute of
+        Nothing ->
+            { title = routeToTitle NotFound
+            , body =
+                [ E.layout
+                    [ E.width E.fill, E.height E.fill ]
+                    (E.column [ E.width E.fill, E.height E.fill ]
+                        [ viewHeader model
+                        , notFoundView "not found"
+                        , viewFooter model
+                        ]
+                    )
+                ]
+            }
 
-            Idle ->
-                Keyed.column [ E.spacing 24, E.padding 24 ]
-                    (List.map (\movie -> ( String.fromInt movie.id, viewMovieCard movie )) model.movies)
+        Just route ->
+            let
+                title =
+                    routeToTitle route
+            in
+            { title = title
+            , body =
+                [ E.layout [ E.width E.fill, E.height E.fill ]
+                    (E.column [ E.width E.fill, E.height E.fill ]
+                        [ viewHeader model
+                        , case route of
+                            Home ->
+                                homeView model
 
-            Error errorMessage ->
-                E.column [ E.centerX, E.centerY ]
-                    [ E.el [ Font.color color.red, E.padding 12 ] (E.text errorMessage)
-                    , Input.button [ E.paddingXY 12 8, E.centerX, E.centerY, Font.color color.white, Background.color color.blue, Border.rounded 4 ]
-                        { label = E.text "Retry"
-                        , onPress = Just GetPopularMovies
-                        }
-                    ]
+                            Details id ->
+                                viewDetailsPage model id
 
-            Broken errorMessage ->
-                E.el [ Font.color color.red, E.centerX, E.centerY ] (E.text errorMessage)
-        )
+                            _ ->
+                                notFoundView "not found"
+                        , viewFooter model
+                        ]
+                    )
+                ]
+            }
 
 
 
@@ -311,9 +427,11 @@ subscriptions _ =
 
 main : Program Decode.Value Model Msg
 main =
-    Browser.element
+    Browser.application
         { view = view
         , init = init
         , update = update
         , subscriptions = subscriptions
+        , onUrlChange = UrlChanged
+        , onUrlRequest = LinkClicked
         }
